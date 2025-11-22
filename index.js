@@ -155,7 +155,6 @@ async function run() {
       }
 
       try {
-        // ১. ইউজারটি ইতোমধ্যে জয়েন করেছে কিনা তা পরীক্ষা করা
         const existingJoin = await joinedEventsCollection.findOne({
           eventId: eventId,
           userEmail: userEmail,
@@ -168,7 +167,6 @@ async function run() {
           });
         }
 
-        // ২. নতুন জয়েন রেকর্ড তৈরি করা
         const joinRecord = {
           eventId: eventId,
           userEmail: userEmail,
@@ -177,10 +175,9 @@ async function run() {
 
         const result = await joinedEventsCollection.insertOne(joinRecord);
 
-        // ৩. events কালেকশনে অংশগ্রহণকারীর সংখ্যা (participants) ১ বাড়ানো (ঐচ্ছিক কিন্তু ভালো প্র্যাকটিস)
         await eventsCollection.updateOne(
           { _id: new ObjectId(eventId) },
-          { $inc: { participants: 1 } } // participants ফিল্ড ১ বাড়ানো হলো
+          { $inc: { participants: 1 } }
         );
 
         res.send({
@@ -194,6 +191,88 @@ async function run() {
           success: false,
           message: "Failed to join event due to server error.",
         });
+      }
+    });
+
+    // -------------------------------------------------------------------
+    // F. নিজের তৈরি করা ইভেন্ট লোড করার API রুট (GET /api/my-events/:email)
+    // -------------------------------------------------------------------
+
+    app.get("/api/my-events/:email", async (req, res) => {
+      const organizerEmail = req.params.email;
+
+      if (!organizerEmail) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Organizer Email is required." });
+      }
+
+      try {
+        const query = { organizerEmail: organizerEmail };
+
+        const myEvents = await eventsCollection.find(query).toArray();
+
+        res.send(myEvents);
+      } catch (error) {
+        console.error("Error fetching my events:", error);
+        res.status(500).send({
+          success: false,
+          message: "Failed to fetch events created by user.",
+        });
+      }
+    });
+    // -------------------------------------------------------------------
+    // G. ইভেন্ট আপডেট করার API রুট (PUT /api/events/:id)
+    // -------------------------------------------------------------------
+
+    app.put("/api/events/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedEventData = req.body;
+      const { organizerEmail } = updatedEventData;
+
+      if (!ObjectId.isValid(id) || !organizerEmail) {
+        return res.status(400).send({
+          success: false,
+          message: "Invalid ID or missing organizer email.",
+        });
+      }
+
+      try {
+        const query = {
+          _id: new ObjectId(id),
+          organizerEmail: organizerEmail,
+        };
+
+        const updateDoc = {
+          $set: {
+            eventName: updatedEventData.eventName,
+            category: updatedEventData.category,
+            location: updatedEventData.location,
+            description: updatedEventData.description,
+            image: updatedEventData.image,
+            eventDate: updatedEventData.eventDate,
+          },
+        };
+
+        const result = await eventsCollection.updateOne(query, updateDoc);
+
+        if (result.matchedCount === 0) {
+          return res.status(403).send({
+            success: false,
+            message: "Forbidden: You can only update events you created.",
+          });
+        }
+
+        res.send({
+          success: true,
+          message: "Event updated successfully!",
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (error) {
+        console.error("Error updating event:", error);
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to update event." });
       }
     });
 
