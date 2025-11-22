@@ -58,18 +58,21 @@ async function run() {
     });
 
     //--------------------------------------------
-    // 2nd. Upcoming Events API রুট (GET/api/events)
+    // 2nd. Upcoming Events API রুট (GET/api/events/upcoming)
     //----------------------------------------------
-    app.get("/api/events", async (req, res) => {
-      const today = new Date();
+    app.get("/api/events/upcoming", async (req, res) => {
+      const today = new Date().toISOString();
       const query = {
         eventDate: {
-          $gte: today.toISOString(),
+          $gte: today,
         },
       };
       try {
-        const events = await eventsCollection.find(query).toArray();
-        res.send(events);
+        const events = await eventsCollection
+          .find(query)
+          .sort({ eventDate: 1 })
+          .toArray();
+        res.send({ success: true, events });
       } catch (error) {
         res.status(500).send({
           success: false,
@@ -91,13 +94,20 @@ async function run() {
       }
       const query = { _id: new ObjectId(id) };
       try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid Event ID format." });
+        }
+        const query = { _id: new ObjectId(id) };
         const event = await eventsCollection.findOne(query);
         if (!event) {
           return res
             .status(404)
             .send({ success: false, message: "Event not found." });
         }
-        res.send(event);
+        res.send({ success: true, event }); // ফ্রন্টএন্ডে object পাঠানো
       } catch (error) {
         res
           .status(500)
@@ -108,31 +118,26 @@ async function run() {
     // -------------------------------------------------------------------
     // 4th. Joined Events দেখানোর API রুট (GET /api/joined-events/:email)
     // -------------------------------------------------------------------
-
     app.get("/api/joined-events/:email", async (req, res) => {
       const userEmail = req.params.email;
-
       try {
+        // ১. userEmail-এর সাথে মিল রেখে JoinedEvents কালেকশন থেকে সমস্ত রেকর্ড Fetch করা
         const joinedRecords = await joinedEventsCollection
           .find({ userEmail: userEmail })
           .toArray();
 
-        if (joinedRecords.length === 0) {
-          return res.send([]);
-        }
-
+        // ২. শুধুমাত্র ইভেন্টের ID গুলো সংগ্রহ করা
         const eventIds = joinedRecords.map(
           (record) => new ObjectId(record.eventId)
         );
 
-        const eventsQuery = { _id: { $in: eventIds } };
-
+        // ৩. Events কালেকশন থেকে সেই ID গুলোর সাথে সম্পর্কিত পুরো ইভেন্ট ডেটা Fetch করা
         const joinedEvents = await eventsCollection
-          .find(eventsQuery)
-          .sort({ eventDate: 1 })
+          .find({ _id: { $in: eventIds } })
+          .sort({ eventDate: 1 }) // তারিখ অনুসারে সাজানো
           .toArray();
 
-        res.send(joinedEvents);
+        res.send(joinedEvents); // ফ্রন্টএন্ডের JoinedEvents কম্পোনেন্টটি সরাসরি array আশা করছে
       } catch (error) {
         console.error("Error fetching joined events:", error);
         res
@@ -142,7 +147,7 @@ async function run() {
     });
 
     // -------------------------------------------------------------------
-    // E. Event Join করার API রুট (POST /api/join-event)
+    // 5th. Event Join করার API রুট (POST /api/join-event)
     // -------------------------------------------------------------------
 
     app.post("/api/join-event", async (req, res) => {
@@ -195,34 +200,36 @@ async function run() {
     });
 
     // -------------------------------------------------------------------
-    // F. নিজের তৈরি করা ইভেন্ট লোড করার API রুট (GET /api/my-events/:email)
+    // 6th. নিজের তৈরি করা ইভেন্ট লোড করার API রুট (GET /api/events/organizer/:email) - RENAME
     // -------------------------------------------------------------------
-
-    app.get("/api/my-events/:email", async (req, res) => {
+    app.get("/api/events/organizer/:email", async (req, res) => {
+      // Renamed to match front-end
       const organizerEmail = req.params.email;
-
       if (!organizerEmail) {
         return res
           .status(400)
           .send({ success: false, message: "Organizer Email is required." });
       }
-
       try {
         const query = { organizerEmail: organizerEmail };
-
-        const myEvents = await eventsCollection.find(query).toArray();
-
-        res.send(myEvents);
+        // নতুন তৈরি ইভেন্টগুলো আগে দেখানোর জন্য
+        const myEvents = await eventsCollection
+          .find(query)
+          .sort({ postedAt: -1 })
+          .toArray();
+        res.send({ success: true, events: myEvents }); // ফ্রন্টএন্ডে object {success: true, events: []} পাঠানো
       } catch (error) {
         console.error("Error fetching my events:", error);
-        res.status(500).send({
-          success: false,
-          message: "Failed to fetch events created by user.",
-        });
+        res
+          .status(500)
+          .send({
+            success: false,
+            message: "Failed to fetch events created by user.",
+          });
       }
     });
     // -------------------------------------------------------------------
-    // G. ইভেন্ট আপডেট করার API রুট (PUT /api/events/:id)
+    // 7th. ইভেন্ট আপডেট করার API রুট (PUT /api/events/:id)
     // -------------------------------------------------------------------
 
     app.put("/api/events/:id", async (req, res) => {
@@ -273,6 +280,52 @@ async function run() {
         res
           .status(500)
           .send({ success: false, message: "Failed to update event." });
+      }
+    });
+
+    // -------------------------------------------------------------------
+    // 8th. ইভেন্ট ডিলিট করার API রুট (DELETE /api/events/:id) - Optional
+    // -------------------------------------------------------------------
+
+    app.delete("/api/events/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const { organizerEmail } = req.query;
+
+      if (!ObjectId.isValid(id) || !organizerEmail) {
+        return res.status(400).send({
+          success: false,
+          message: "Invalid ID or missing organizer email.",
+        });
+      }
+
+      try {
+        const query = {
+          _id: new ObjectId(id),
+          organizerEmail: organizerEmail,
+        };
+
+        const result = await eventsCollection.deleteOne(query);
+
+        if (result.deletedCount === 0) {
+          return res.status(403).send({
+            success: false,
+            message: "Forbidden: You can only delete events you created.",
+          });
+        }
+
+        await joinedEventsCollection.deleteMany({ eventId: id });
+
+        res.send({
+          success: true,
+          message: "Event deleted successfully!",
+          deletedCount: result.deletedCount,
+        });
+      } catch (error) {
+        console.error("Error deleting event:", error);
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to delete event." });
       }
     });
 
