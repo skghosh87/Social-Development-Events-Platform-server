@@ -58,9 +58,9 @@ async function run() {
     });
 
     //--------------------------------------------
-    // 2nd. Upcoming Events API রুট (GET/api/upcoming-events)
+    // 2nd. Upcoming Events API রুট (GET/api/events)
     //----------------------------------------------
-    app.get("/api/upcoming-events", async (req, res) => {
+    app.get("/api/events", async (req, res) => {
       const today = new Date();
       const query = {
         eventDate: {
