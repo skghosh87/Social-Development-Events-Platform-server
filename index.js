@@ -141,6 +141,62 @@ async function run() {
       }
     });
 
+    // -------------------------------------------------------------------
+    // E. Event Join করার API রুট (POST /api/join-event)
+    // -------------------------------------------------------------------
+
+    app.post("/api/join-event", async (req, res) => {
+      const { eventId, userEmail } = req.body;
+
+      if (!eventId || !userEmail) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Missing Event ID or User Email." });
+      }
+
+      try {
+        // ১. ইউজারটি ইতোমধ্যে জয়েন করেছে কিনা তা পরীক্ষা করা
+        const existingJoin = await joinedEventsCollection.findOne({
+          eventId: eventId,
+          userEmail: userEmail,
+        });
+
+        if (existingJoin) {
+          return res.status(409).send({
+            success: false,
+            message: "You have already joined this event.",
+          });
+        }
+
+        // ২. নতুন জয়েন রেকর্ড তৈরি করা
+        const joinRecord = {
+          eventId: eventId,
+          userEmail: userEmail,
+          joinedDate: new Date().toISOString(),
+        };
+
+        const result = await joinedEventsCollection.insertOne(joinRecord);
+
+        // ৩. events কালেকশনে অংশগ্রহণকারীর সংখ্যা (participants) ১ বাড়ানো (ঐচ্ছিক কিন্তু ভালো প্র্যাকটিস)
+        await eventsCollection.updateOne(
+          { _id: new ObjectId(eventId) },
+          { $inc: { participants: 1 } } // participants ফিল্ড ১ বাড়ানো হলো
+        );
+
+        res.send({
+          success: true,
+          insertedId: result.insertedId,
+          message: "Successfully joined the event!",
+        });
+      } catch (error) {
+        console.error("Error joining event:", error);
+        res.status(500).send({
+          success: false,
+          message: "Failed to join event due to server error.",
+        });
+      }
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
