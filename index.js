@@ -105,6 +105,42 @@ async function run() {
       }
     });
 
+    // -------------------------------------------------------------------
+    // 4th. Joined Events দেখানোর API রুট (GET /api/joined-events/:email)
+    // -------------------------------------------------------------------
+
+    app.get("/api/joined-events/:email", async (req, res) => {
+      const userEmail = req.params.email;
+
+      try {
+        const joinedRecords = await joinedEventsCollection
+          .find({ userEmail: userEmail })
+          .toArray();
+
+        if (joinedRecords.length === 0) {
+          return res.send([]);
+        }
+
+        const eventIds = joinedRecords.map(
+          (record) => new ObjectId(record.eventId)
+        );
+
+        const eventsQuery = { _id: { $in: eventIds } };
+
+        const joinedEvents = await eventsCollection
+          .find(eventsQuery)
+          .sort({ eventDate: 1 })
+          .toArray();
+
+        res.send(joinedEvents);
+      } catch (error) {
+        console.error("Error fetching joined events:", error);
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to fetch joined events." });
+      }
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
