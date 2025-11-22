@@ -30,7 +30,7 @@ async function run() {
     const joinedEventsCollection = database.collection("joinedEvents");
 
     // -------------------------------------------------------------------
-    // Event API রুট method: Post (POST/api/events)
+    // 1st. Event API রুট method: Post (POST/api/events)
     // -------------------------------------------------------------------
 
     app.post("/api/events", async (req, res) => {
@@ -56,6 +56,31 @@ async function run() {
         });
       }
     });
+
+    //--------------------------------------------
+    // 2nd. Upcoming Events API রুট (GET/api/events)
+    //----------------------------------------------
+    app.get("/api/events", async (req, res) => {
+      const today = new Date();
+      const query = {
+        eventDate: {
+          $gte: today.toISOString(),
+        },
+      };
+      try {
+        const events = await eventsCollection.find(query).toArray();
+        res.send(events);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: "Failed to fetch upcoming events.",
+        });
+      }
+    });
+
+    //------------------------------------------
+    //3rd.
+    //------------------------------------------
 
     await client.db("admin").command({ ping: 1 });
     console.log(
