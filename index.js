@@ -58,9 +58,9 @@ async function run() {
     });
 
     //--------------------------------------------
-    // 2nd. Upcoming Events API রুট (GET/api/events)
+    // 2nd. Upcoming Events API রুট (GET/api/upcoming-events)
     //----------------------------------------------
-    app.get("/api/events", async (req, res) => {
+    app.get("/api/upcoming-events", async (req, res) => {
       const today = new Date();
       const query = {
         eventDate: {
@@ -79,8 +79,31 @@ async function run() {
     });
 
     //------------------------------------------
-    //3rd.
+    //3rd. Single Event Details দেখানোর API রুট (GET /api/events/:id)
     //------------------------------------------
+
+    app.get("/api/events/:id", async (req, res) => {
+      const id = req.params.id;
+      if (!ObjectId.isValid(id)) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid Event ID format." });
+      }
+      const query = { _id: new ObjectId(id) };
+      try {
+        const event = await eventsCollection.findOne(query);
+        if (!event) {
+          return res
+            .status(404)
+            .send({ success: false, message: "Event not found." });
+        }
+        res.send(event);
+      } catch (error) {
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to fetch event details." });
+      }
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
