@@ -10,7 +10,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const uri = process.env.DB_URI;
+const uri = `mongodb+srv://${process.env.DB_UserName}:${process.env.DB_Password}@skghosh.wrzjkjg.mongodb.net/?appName=Skghosh`;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -53,12 +53,18 @@ async function run() {
     }); // 2nd. Upcoming Events API রুট (GET/api/events/upcoming)
 
     app.get("/api/events/upcoming", async (req, res) => {
+      const { category, search } = req.query; // Query প্যারামিটারগুলো নিন
       const today = new Date().toISOString();
-      const query = {
-        eventDate: {
-          $gte: today,
-        },
-      };
+      let query = { eventDate: { $gte: today } };
+
+      if (category && category !== "all") {
+        // ক্যাটাগরি ফিল্টার যোগ করা
+        query.eventType = category; // assuming field name is eventType
+      }
+      if (search) {
+        // সার্চ ফিল্টার যোগ করা
+        query.eventName = { $regex: new RegExp(search, "i") }; // Case-insensitive search
+      }
       try {
         const events = await eventsCollection
           .find(query)
@@ -71,7 +77,8 @@ async function run() {
           message: "Failed to fetch upcoming events.",
         });
       }
-    }); // 3rd. Single Event Details দেখানোর API রুট (GET /api/events/:id)
+    });
+    // 3rd. Single Event Details দেখানোর API রুট (GET /api/events/:id)
 
     app.get("/api/events/:id", async (req, res) => {
       const id = req.params.id;
