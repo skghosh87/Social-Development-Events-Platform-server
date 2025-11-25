@@ -26,7 +26,8 @@ async function run() {
 
     const database = client.db("socialdevelopment");
     const eventsCollection = database.collection("events");
-    const joinedEventsCollection = database.collection("joinedEvents"); // 1st. Event API রুট method: Post (POST/api/events)
+    const joinedEventsCollection = database.collection("joinedEvents");
+    // 1st. Event API রুট method: Post (POST/api/events)
 
     app.post("/api/events", async (req, res) => {
       const newEvent = req.body;
@@ -50,20 +51,19 @@ async function run() {
           message: "Failed to insert event into database.",
         });
       }
-    }); // 2nd. Upcoming Events API রুট (GET/api/events/upcoming)
+    });
+    // 2nd. Upcoming Events API রুট (GET/api/events/upcoming)
 
     app.get("/api/events/upcoming", async (req, res) => {
-      const { category, search } = req.query; // Query প্যারামিটারগুলো নিন
+      const { category, search } = req.query;
       const today = new Date().toISOString();
       let query = { eventDate: { $gte: today } };
 
       if (category && category !== "all") {
-        // ক্যাটাগরি ফিল্টার যোগ করা
-        query.eventType = category; // assuming field name is eventType
+        query.eventType = category;
       }
       if (search) {
-        // সার্চ ফিল্টার যোগ করা
-        query.eventName = { $regex: new RegExp(search, "i") }; // Case-insensitive search
+        query.eventName = { $regex: new RegExp(search, "i") };
       }
       try {
         const events = await eventsCollection
@@ -89,20 +89,20 @@ async function run() {
       }
       const query = { _id: new ObjectId(id) };
       try {
-        // ⭐ এইখানে ডুপ্লিকেট কোডটি মুছে ফেলা হয়েছে
         const event = await eventsCollection.findOne(query);
         if (!event) {
           return res
             .status(404)
             .send({ success: false, message: "Event not found." });
         }
-        res.send({ success: true, event }); // ফ্রন্টএন্ডে object পাঠানো
+        res.send({ success: true, event });
       } catch (error) {
         res
           .status(500)
           .send({ success: false, message: "Failed to fetch event details." });
       }
-    }); // 4th. Joined Events দেখানোর API রুট (GET /api/joined-events/:email)
+    });
+    // 4th. Joined Events দেখানোর API রুট (GET /api/joined-events/:email)
 
     app.get("/api/joined-events/:email", async (req, res) => {
       const userEmail = req.params.email;
@@ -127,7 +127,8 @@ async function run() {
           .status(500)
           .send({ success: false, message: "Failed to fetch joined events." });
       }
-    }); // 5th. Event Join করার API রুট (POST /api/join-event)
+    });
+    // 5th. Event Join করার API রুট (POST /api/join-event)
 
     app.post("/api/join-event", async (req, res) => {
       const { eventId, userEmail } = req.body;
@@ -176,7 +177,8 @@ async function run() {
           message: "Failed to join event due to server error.",
         });
       }
-    }); // 6th. নিজের তৈরি করা ইভেন্ট লোড করার API রুট (GET /api/events/organizer/:email)
+    });
+    // 6th. নিজের তৈরি করা ইভেন্ট লোড করার API রুট (GET /api/events/organizer/:email)
 
     app.get("/api/events/organizer/:email", async (req, res) => {
       const organizerEmail = req.params.email;
@@ -199,7 +201,8 @@ async function run() {
           message: "Failed to fetch events created by user.",
         });
       }
-    }); // 7th. ইভেন্ট আপডেট করার API রুট (PUT /api/events/:id)
+    });
+    // 7th. ইভেন্ট আপডেট করার API রুট (PUT /api/events/:id)
 
     app.put("/api/events/:id", async (req, res) => {
       const id = req.params.id;
@@ -250,7 +253,8 @@ async function run() {
           .status(500)
           .send({ success: false, message: "Failed to update event." });
       }
-    }); // 8th. ইভেন্ট ডিলিট করার API রুট (DELETE /api/events/:id)
+    });
+    // 8th. ইভেন্ট ডিলিট করার API রুট (DELETE /api/events/:id)
 
     app.delete("/api/events/:id", async (req, res) => {
       const id = req.params.id;
